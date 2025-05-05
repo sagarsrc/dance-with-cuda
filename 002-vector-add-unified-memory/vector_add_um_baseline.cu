@@ -4,10 +4,10 @@
  *
  *
  *
- * Compile: nvcc vector_add_um.cu -o cu_vector_add_um.bin
- * Run: ./cu_vector_add_um.bin
- * Profiling: nvprof ./cu_vector_add_um.bin
- * Print GPU trace: nvprof  --print-gpu-trace ./cu_vector_add_um.bin
+ * Compile: nvcc vector_add_um_baseline.cu -o cu_vector_add_um_baseline.bin
+ * Run: ./cu_vector_add_um_baseline.bin
+ * Profiling: nvprof ./cu_vector_add_um_baseline.bin
+ * Print GPU trace: nvprof  --print-gpu-trace ./cu_vector_add_um_baseline.bin
  */
 
 #include <iostream>
@@ -83,7 +83,12 @@ int main()
      * When called all the CPU threads will wait for all the preceeding CUDA operations to complete
      * e.g memory transfers, kernel launches etc
      * This also ensures that neither CPU nor the GPU is accessing the memory location simultaneously, hence avoiding race conditions
+     * If you notice the output of nvprof, you will see that there are multiple page faults
+     * This is because the data is not present on the device when the kernel is launched
+     * so we need to page in the memory from host to device i.e bring in the data from host to device
+     * Notice ==4539== Unified Memory profiling result section for checking number of page faults
      */
+
     // wait for all previous operations to complete
     cudaDeviceSynchronize();
 
@@ -99,10 +104,10 @@ int main()
 }
 
 /**
-nvprof   ./cu_vector_add_um.bin
-==4539== NVPROF is profiling process 4539, command: ./cu_vector_add_um.bin
+nvprof   ./cu_vector_add_um_baseline.bin
+==4539== NVPROF is profiling process 4539, command: ./cu_vector_add_um_baseline.bin
 Resultant vector is correct
-==4539== Profiling application: ./cu_vector_add_um.bin
+==4539== Profiling application: ./cu_vector_add_um_baseline.bin
 ==4539== Profiling result:
             Type  Time(%)      Time     Calls       Avg       Min       Max  Name
  GPU activities:  100.00%  458.30us         1  458.30us  458.30us  458.30us  vectorAdd(int const *, int const *, int*, int)
@@ -128,10 +133,10 @@ Total CPU Page faults: 12
  */
 
 /**
- nvprof  --print-gpu-trace ./cu_vector_add_um.bin
-==4320== NVPROF is profiling process 4320, command: ./cu_vector_add_um.bin
+ nvprof  --print-gpu-trace ./cu_vector_add_um_baseline_baseline.bin
+==4320== NVPROF is profiling process 4320, command: ./cu_vector_add_um_baseline.bin
 Resultant vector is correct
-==4320== Profiling application: ./cu_vector_add_um.bin
+==4320== Profiling application: ./cu_vector_add_um_baseline.bin
 ==4320== Profiling result:
    Start  Duration            Grid Size      Block Size     Regs*    SSMem*    DSMem*           Device   Context    Stream        Unified Memory  Virtual Address  Name
 515.70ms         -                    -               -         -         -         -                -         -         -         PC 0x58344172   0x7b552e000000  [Unified Memory CPU page faults]
