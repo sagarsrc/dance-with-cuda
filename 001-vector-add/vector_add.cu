@@ -44,6 +44,8 @@
  *
  * Compilation: nvcc vector_add.cu -o vector_add.bin
  * Execution: ./vector_add.bin
+ * Profiling: nvprof ./vector_add.bin
+ * Print GPU trace: nvprof  --print-gpu-trace ./vector_add.bin
  */
 #include <iostream>
 #include <bits/stdc++.h>
