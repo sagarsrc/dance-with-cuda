@@ -81,6 +81,11 @@ __global__ void matrixMul(int *d_a, int *d_b, int *d_c, int N)
      * Another thing to note here is:
      * - if you assign a large number of threads the threads will still execute this kernel function
      * - but will be blocked by if condition where we are specifying valid row and column indices
+     *
+     * Using inherent properties of threads, we are trying to determine:
+     * 1. Which is a valid row number and column number that needs to be multiplied
+     * 2. Once we have that, we can iterate sequentially over the elements of the row and column
+     * 3. And calculate the result matrix element
      */
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
