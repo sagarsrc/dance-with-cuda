@@ -35,10 +35,10 @@ __global__ void printArrayWithTidLimit(int *a, int N)
 
 __global__ void printIndices()
 {
-    int tidx = (blockIdx.x * blockDim.x) + threadIdx.x;
-    int tidy = (blockIdx.y * blockDim.y) + threadIdx.y;
-    printf("blockIdx.x = %d, blockDim.x = %d, threadIdx.x = %d | tidx = %d\n", blockIdx.x, blockDim.x, threadIdx.x, tidx);
-    printf("blockIdx.y = %d, blockDim.y = %d, threadIdx.y = %d | tidy = %d\n", blockIdx.y, blockDim.y, threadIdx.y, tidy);
+    int globalX = blockIdx.x * blockDim.x + threadIdx.x;
+    int globalY = blockIdx.y * blockDim.y + threadIdx.y;
+
+    printf("blockDim.x, blockDim.y = (%d, %d) | blockIdx.x, blockIdx.y = (%d, %d) | threadIdx.x, threadIdx.y = (%d, %d) | globalX, globalY = (%d, %d)\n", blockDim.x, blockDim.y, blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y, globalX, globalY);
 }
 
 int main(int argc, char **argv)
@@ -71,8 +71,8 @@ int main(int argc, char **argv)
     cudaDeviceSynchronize();
 
     printf("Printing indices\n");
-    dim3 threads(2, 5);
-    dim3 blocks(5, 5);
+    dim3 threads(2, 3);
+    dim3 blocks(4, 4);
     printIndices<<<blocks, threads>>>();
     cudaDeviceSynchronize();
 
