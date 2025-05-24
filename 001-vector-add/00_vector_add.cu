@@ -14,6 +14,16 @@
  *  [block, block, ...]
  *  [[thread, thread, ...], [thread, thread, ...], ...]
  *
+ * How to determine blockDim and gridDim?
+ * - number of threads per block determines blockDim
+ *   - e.g if blockDim.x = 1024, then each block will have 1024 threads
+ *   - similarly if number of threads per block = 256, means blockDim is 256
+ *
+ * - number of blocks in the grid determines gridDim
+ *   - e.g if gridDim.x = 1024, then there will be 1024 blocks in the grid
+ *   - similarly if number of blocks in the grid = 256, means gridDim is 256
+ *
+ *
  * Thread Block = CTA = Cooperative Thread Array (nvidia's term for block in CUDA)
  * Global TID = global thread id
  *
