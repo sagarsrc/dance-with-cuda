@@ -10,29 +10,17 @@
 using namespace std;
 
 // CUDA kernel to print only rows
-__global__ void printRows(int *matrix, int N) {
-    int row = blockIdx.x * blockDim.x + threadIdx.x;
+__global__ void printRows(int *matrix, int num_rows, int num_cols) {
 
-    if (row < N) {
-        printf("Row %d: ", row);
-        for (int i = 0; i < N; i++) {
-            printf("%d ", matrix[row * N + i]);
-        }
+    int row_ix = blockIdx.x * blockDim.x + threadIdx.x;
+    int col_ix = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (row_ix < num_rows && col_ix < num_cols){
+        printf("%d ", matrix[row_ix * num_cols + col_ix]);
+        __syncthreads();
         printf("\n");
     }
-}
 
-// CUDA kernel to print only columns
-__global__ void printColumns(int *matrix, int N) {
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (col < N) {
-        printf("Col %d: ", col);
-        for (int i = 0; i < N; i++) {
-            printf("%d ", matrix[i * N + col]);
-        }
-        printf("\n");
-    }
 }
 
 // Host function to print matrix
@@ -80,29 +68,23 @@ int main() {
     cudaMemcpy(d_b, h_b.data(), N * N * sizeof(int), cudaMemcpyHostToDevice);
 
     // Launch kernels with appropriate grid/block dimensions
-    dim3 threads(N);  // N threads per block
-    dim3 blocks(N);   // 1 block (since we only need N threads for NxN)
+    int threads_per_block = N;
+    int blocks_per_grid = ((N*N) + threads_per_block - 1 )/ threads_per_block;
+    cout << "threads_per_block: " << threads_per_block << endl;
+    cout << "blocks_per_grid: " << blocks_per_grid << endl;
+
+    dim3 threads(threads_per_block, threads_per_block);
+    dim3 blocks(blocks_per_grid);
 
     printf("=== CUDA Row Printing ===\n");
     printf("Matrix A - Rows:\n");
-    printRows<<<blocks, threads>>>(d_a, N);
+    printRows<<<blocks, threads>>>(d_a, N, N);
     cudaDeviceSynchronize();
 
-    printf("\nMatrix B - Rows:\n");
-    printRows<<<blocks, threads>>>(d_b, N);
-    cudaDeviceSynchronize();
-
-    printf("\n=== CUDA Column Printing ===\n");
-    printf("Matrix A - Columns:\n");
-    printColumns<<<blocks, threads>>>(d_a, N);
-    cudaDeviceSynchronize();
-
-    printf("\nMatrix B - Columns:\n");
-    printColumns<<<blocks, threads>>>(d_b, N);
-    cudaDeviceSynchronize();
 
     // Cleanup
     cudaFree(d_a);
+
     cudaFree(d_b);
 
     return 0;
@@ -123,7 +105,7 @@ Matrix B:
 === CUDA Row Printing ===
 Matrix A - Rows:
 Row 0: Row 1: 1 3 2 4
-
+Why does this happen?
 
 Matrix B - Rows:
 Row 0: Row 1: 5 7 6 8
