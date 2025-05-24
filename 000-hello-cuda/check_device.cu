@@ -3,7 +3,8 @@
 #include <cuda_runtime.h>
 #include <string>
 #include <vector>
-#include <iomanip>
+#include <algorithm>
+#include <sstream>
 
 // Error handling function
 #define checkCudaErrors(call)                                     \
@@ -17,367 +18,419 @@
         }                                                         \
     }
 
-// Function to create a fixed-width string with content centered
-std::string centerString(const std::string &text, int width)
+// Safe string truncation and padding
+std::string safeFormat(const std::string &text, int width, bool center = false)
 {
-    int padding = width - text.length();
-    int padLeft = padding / 2;
-    int padRight = padding - padLeft;
-    return std::string(padLeft, ' ') + text + std::string(padRight, ' ');
-}
+    if (width <= 0) return "";
 
-// Function to create fixed-width string with left alignment and proper padding
-std::string formatLine(const std::string &content, int width)
-{
-    if (content.length() >= width)
+    std::string result = text;
+
+    // Truncate if too long
+    if (result.length() > static_cast<size_t>(width))
     {
-        return content.substr(0, width);
-    }
-    return content + std::string(width - content.length(), ' ');
-}
-
-// Print a horizontal line with consistent characters
-void printHLine(int width, char leftChar, char lineChar, char rightChar)
-{
-    std::cout << leftChar << std::string(width - 2, lineChar) << rightChar << std::endl;
-}
-
-// Print a content line with vertical borders
-void printContentLine(const std::string &content, int width, char leftChar, char rightChar)
-{
-    std::cout << leftChar << formatLine(content, width - 2) << rightChar << std::endl;
-}
-
-// Print an empty line with just vertical borders
-void printEmptyLine(int width, char borderChar)
-{
-    printContentLine("", width, borderChar, borderChar);
-}
-
-// Print a box section for blocks in a grid
-void printGridBlocks(const std::string &label1, const std::string &label2, const std::string &label3)
-{
-    int blockWidth = 13;
-    int spacing = 6;
-
-    // Print labels
-    std::cout << "|   " << formatLine(label1, blockWidth)
-              << std::string(spacing, ' ') << formatLine(label2, blockWidth)
-              << std::string(spacing, ' ') << formatLine(label3, blockWidth) << "     |" << std::endl;
-
-    // Print top lines of blocks
-    std::cout << "|   +" << std::string(blockWidth - 2, '-') << "+"
-              << std::string(spacing, ' ') << "+" << std::string(blockWidth - 2, '-') << "+"
-              << std::string(spacing, ' ') << "+" << std::string(blockWidth - 2, '-') << "+     |" << std::endl;
-
-    // Print content lines
-    for (int i = 0; i < 3; i++)
-    {
-        std::string middle = (i == 1 && label3.find("2") != std::string::npos) ? " . " : "   ";
-        std::cout << "|   |" << std::string(blockWidth - 2, ' ') << "|"
-                  << std::string(spacing, ' ') << "|" << std::string(blockWidth - 2, ' ') << "|"
-                  << std::string(spacing, ' ') << "|" << formatLine(middle, blockWidth - 2) << "|     |" << std::endl;
+        result = result.substr(0, width - 3) + "...";
     }
 
-    // Print bottom lines of blocks
-    std::cout << "|   +" << std::string(blockWidth - 2, '-') << "+"
-              << std::string(spacing, ' ') << "+" << std::string(blockWidth - 2, '-') << "+"
-              << std::string(spacing, ' ') << "+" << std::string(blockWidth - 2, '-') << "+     |" << std::endl;
+    // Pad to exact width
+    if (center)
+    {
+        int padding = width - result.length();
+        int padLeft = padding / 2;
+        int padRight = padding - padLeft;
+        result = std::string(padLeft, ' ') + result + std::string(padRight, ' ');
+    }
+    else
+    {
+        result += std::string(width - result.length(), ' ');
+    }
+
+    return result;
 }
 
-// Print a title box
+// Print horizontal line with exact width
+void printHorizontalLine(int width, char corner, char line)
+{
+    std::cout << corner << std::string(width - 2, line) << corner << std::endl;
+}
+
+// Print content line with exact width and borders
+void printContentLine(const std::string &content, int width)
+{
+    std::string formatted = safeFormat(content, width - 2);
+    std::cout << "|" << formatted << "|" << std::endl;
+}
+
+// Print empty line
+void printEmptyLine(int width)
+{
+    printContentLine("", width);
+}
+
+// Print centered title line
+void printTitleLine(const std::string &title, int width)
+{
+    std::string formatted = safeFormat(title, width - 4, true);
+    std::cout << "||" << formatted << "||" << std::endl;
+}
+
+// Print title box with double borders
 void printTitleBox(const std::string &title, const std::string &deviceName, int width)
 {
-    // Using equals sign for title box to differentiate it
-    printHLine(width, '=', '=', '=');
-    printContentLine("||" + centerString("CUDA EXECUTION HIERARCHY", width - 4) + "||", width, ' ', ' ');
-    printContentLine("||" + centerString("Device: " + deviceName, width - 4) + "||", width, ' ', ' ');
-    printHLine(width, '=', '=', '=');
+    printHorizontalLine(width, '=', '=');
+    printTitleLine("CUDA EXECUTION HIERARCHY", width);
+    printTitleLine("Device: " + deviceName, width);
+    printHorizontalLine(width, '=', '=');
     std::cout << std::endl;
 }
 
-// Print a section header
+// Print section header
 void printSectionHeader(const std::string &title, int width)
 {
-    std::cout << title << ":" << std::endl;
-    printHLine(width, '+', '-', '+');
+    printHorizontalLine(width, '+', '-');
+    printContentLine(" " + title, width);
+    printHorizontalLine(width, '+', '-');
 }
 
-// Print a content box
-void printContentBox(const std::string &title, int width, const std::vector<std::string> &content)
+// Print section footer
+void printSectionFooter(int width)
 {
-    printSectionHeader(title, width);
-
-    for (const auto &line : content)
-    {
-        printContentLine(line, width, '|', '|');
-    }
-
-    printHLine(width, '+', '-', '+');
+    printHorizontalLine(width, '+', '-');
     std::cout << std::endl;
 }
 
-// Create content for the Grid Level section
-std::vector<std::string> createGridContent(cudaDeviceProp prop)
+// Create a visual block representation
+void printBlock(const std::string &label, int blockWidth, bool showDot = false)
+{
+    // Block label
+    std::cout << safeFormat(label, blockWidth);
+
+    // Block top border
+    std::cout << std::endl << "+" << std::string(blockWidth - 2, '-') << "+";
+
+    // Block content (3 lines)
+    for (int i = 0; i < 3; i++)
+    {
+        std::cout << std::endl << "|";
+        if (i == 1 && showDot)
+        {
+            std::string dotLine = safeFormat(" . ", blockWidth - 2, true);
+            std::cout << dotLine;
+        }
+        else
+        {
+            std::cout << std::string(blockWidth - 2, ' ');
+        }
+        std::cout << "|";
+    }
+
+    // Block bottom border
+    std::cout << std::endl << "+" << std::string(blockWidth - 2, '-') << "+";
+}
+
+// Print grid blocks in a row
+void printGridRow(const std::vector<std::string> &labels, int width)
+{
+    const int blockWidth = 15;
+    const int spacing = 4;
+    const int numBlocks = 3;
+
+    // Calculate if blocks fit
+    int totalBlockWidth = numBlocks * blockWidth + (numBlocks - 1) * spacing;
+    int leftMargin = (width - 2 - totalBlockWidth) / 2;
+
+    std::string margin = std::string(std::max(1, leftMargin), ' ');
+
+    // Print each line of the blocks
+    for (int line = 0; line < 6; line++) // 6 lines per block (label + top + 3 content + bottom)
+    {
+        std::cout << "|" << margin;
+
+        for (int block = 0; block < numBlocks && block < labels.size(); block++)
+        {
+            if (block > 0) std::cout << std::string(spacing, ' ');
+
+            switch (line)
+            {
+                case 0: // Label
+                    std::cout << safeFormat(labels[block], blockWidth);
+                    break;
+                case 1: // Top border
+                    std::cout << "+" << std::string(blockWidth - 2, '-') << "+";
+                    break;
+                case 2: // Content line 1
+                case 4: // Content line 3
+                    std::cout << "|" << std::string(blockWidth - 2, ' ') << "|";
+                    break;
+                case 3: // Content line 2 (middle, may have dot)
+                    std::cout << "|";
+                    if (labels[block].find("2") != std::string::npos)
+                    {
+                        std::cout << safeFormat(" . ", blockWidth - 2, true);
+                    }
+                    else
+                    {
+                        std::cout << std::string(blockWidth - 2, ' ');
+                    }
+                    std::cout << "|";
+                    break;
+                case 5: // Bottom border
+                    std::cout << "+" << std::string(blockWidth - 2, '-') << "+";
+                    break;
+            }
+        }
+
+        // Fill remaining space
+        int usedWidth = margin.length() + totalBlockWidth;
+        int remainingWidth = width - 2 - usedWidth;
+        std::cout << std::string(std::max(0, remainingWidth), ' ') << "|" << std::endl;
+    }
+}
+
+// Create formatted number with commas
+std::string formatNumber(long long number)
+{
+    std::string str = std::to_string(number);
+    std::string result;
+    int count = 0;
+
+    for (int i = str.length() - 1; i >= 0; i--)
+    {
+        if (count == 3)
+        {
+            result = "," + result;
+            count = 0;
+        }
+        result = str[i] + result;
+        count++;
+    }
+
+    return result;
+}
+
+// Print device properties in a structured way
+void printDeviceProperties(const cudaDeviceProp &prop, int width)
 {
     std::vector<std::string> content;
 
     content.push_back("");
-
-    // Add block grid visualization
-    // First row of blocks
-    printGridBlocks("Block(0,0)", "Block(1,0)", "Block(2,0)");
-
+    content.push_back(" ADDRESSING LIMITS (Theoretical Maximum):");
     content.push_back("");
-
-    // Second row of blocks
-    printGridBlocks("Block(0,1)", "Block(1,1)", "Block(2,1)");
-
-    content.push_back("");
-    content.push_back("   ADDRESSING SPACE (theoretical limits):");
 
     char buffer[256];
-    snprintf(buffer, sizeof(buffer), "   • Up to: %d x %d x %d blocks",
-             prop.maxGridSize[0], prop.maxGridSize[1], prop.maxGridSize[2]);
+    snprintf(buffer, sizeof(buffer), " Grid dimensions: %s x %s x %s blocks",
+             formatNumber(prop.maxGridSize[0]).c_str(),
+             formatNumber(prop.maxGridSize[1]).c_str(),
+             formatNumber(prop.maxGridSize[2]).c_str());
     content.push_back(buffer);
 
-    content.push_back("   • This is just the addressable space, not the");
-    content.push_back("     number of blocks that run simultaneously");
+    snprintf(buffer, sizeof(buffer), " Thread dimensions: %d x %d x %d per block",
+             prop.maxThreadsDim[0], prop.maxThreadsDim[1], prop.maxThreadsDim[2]);
+    content.push_back(buffer);
+
+    snprintf(buffer, sizeof(buffer), " Max threads per block: %s",
+             formatNumber(prop.maxThreadsPerBlock).c_str());
+    content.push_back(buffer);
+
+    content.push_back("");
+    content.push_back(" HARDWARE RESOURCES (Practical Limits):");
     content.push_back("");
 
-    return content;
+    snprintf(buffer, sizeof(buffer), " Streaming Multiprocessors: %d",
+             prop.multiProcessorCount);
+    content.push_back(buffer);
+
+    snprintf(buffer, sizeof(buffer), " Max blocks per SM: %d",
+             prop.maxBlocksPerMultiProcessor);
+    content.push_back(buffer);
+
+    snprintf(buffer, sizeof(buffer), " Warp size: %d threads", prop.warpSize);
+    content.push_back(buffer);
+
+    long long maxConcurrentBlocks = (long long)prop.multiProcessorCount * prop.maxBlocksPerMultiProcessor;
+    snprintf(buffer, sizeof(buffer), " Max concurrent blocks: %s",
+             formatNumber(maxConcurrentBlocks).c_str());
+    content.push_back(buffer);
+
+    long long maxConcurrentThreads = maxConcurrentBlocks * prop.maxThreadsPerBlock;
+    snprintf(buffer, sizeof(buffer), " Max concurrent threads: %s",
+             formatNumber(maxConcurrentThreads).c_str());
+    content.push_back(buffer);
+
+    content.push_back("");
+    content.push_back(" MEMORY:");
+    content.push_back("");
+
+    snprintf(buffer, sizeof(buffer), " Global memory: %.1f GB",
+             static_cast<double>(prop.totalGlobalMem) / (1024.0 * 1024.0 * 1024.0));
+    content.push_back(buffer);
+
+    snprintf(buffer, sizeof(buffer), " Shared memory per block: %.1f KB",
+             static_cast<double>(prop.sharedMemPerBlock) / 1024.0);
+    content.push_back(buffer);
+
+    snprintf(buffer, sizeof(buffer), " Constant memory: %.1f KB",
+             static_cast<double>(prop.totalConstMem) / 1024.0);
+    content.push_back(buffer);
+
+    content.push_back("");
+    snprintf(buffer, sizeof(buffer), " Compute capability: %d.%d",
+             prop.major, prop.minor);
+    content.push_back(buffer);
+    content.push_back("");
+
+    // Print the content
+    printSectionHeader("DEVICE PROPERTIES", width);
+    for (const auto &line : content)
+    {
+        printContentLine(line, width);
+    }
+    printSectionFooter(width);
 }
 
-// Print the CUDA execution hierarchy diagram
-void printCudaHierarchy(cudaDeviceProp prop)
+// Print the CUDA execution hierarchy
+void printCudaHierarchy(const cudaDeviceProp &prop, int width)
 {
-    const int BOX_WIDTH = 80;
+    // GRID LEVEL
+    printSectionHeader("GRID LEVEL - Layout of Blocks", width);
+    printEmptyLine(width);
 
-    // Print the title box
-    printTitleBox("CUDA EXECUTION HIERARCHY", prop.name, BOX_WIDTH);
+    // First row of blocks
+    std::vector<std::string> row1 = {"Block(0,0)", "Block(1,0)", "Block(2,0)"};
+    printGridRow(row1, width);
 
-    // GRID LEVEL SECTION
-    {
-        std::vector<std::string> gridContent;
-        gridContent.push_back("");
+    printEmptyLine(width);
 
-        // First row of blocks
-        gridContent.push_back("   Block(0,0)      Block(1,0)      Block(2,0)");
-        gridContent.push_back("   +------------+  +------------+  +------------+");
-        gridContent.push_back("   |            |  |            |  |            |");
-        gridContent.push_back("   |            |  |            |  |     .      |");
-        gridContent.push_back("   |            |  |            |  |            |");
-        gridContent.push_back("   +------------+  +------------+  +------------+");
-        gridContent.push_back("");
+    // Second row of blocks
+    std::vector<std::string> row2 = {"Block(0,1)", "Block(1,1)", "Block(2,1)"};
+    printGridRow(row2, width);
 
-        // Second row of blocks
-        gridContent.push_back("   Block(0,1)      Block(1,1)      Block(2,1)");
-        gridContent.push_back("   +------------+  +------------+  +------------+");
-        gridContent.push_back("   |            |  |            |  |            |");
-        gridContent.push_back("   |            |  |            |  |     .      |");
-        gridContent.push_back("   |            |  |            |  |            |");
-        gridContent.push_back("   +------------+  +------------+  +------------+");
-        gridContent.push_back("");
+    printEmptyLine(width);
+    printContentLine(" Note: Blocks are scheduled and executed by the hardware", width);
+    printContentLine(" as resources become available.", width);
+    printEmptyLine(width);
+    printSectionFooter(width);
 
-        gridContent.push_back("   ADDRESSING SPACE (theoretical limits):");
+    // BLOCK LEVEL
+    printSectionHeader("BLOCK LEVEL - Threads within a Block", width);
+    printEmptyLine(width);
+    printContentLine("   Thread(0,0)  Thread(1,0)  Thread(2,0)  Thread(3,0) ...", width);
+    printContentLine("   Thread(0,1)  Thread(1,1)  Thread(2,1)  Thread(3,1) ...", width);
+    printContentLine("   Thread(0,2)  Thread(1,2)  Thread(2,2)  Thread(3,2) ...", width);
+    printContentLine("   Thread(0,3)  Thread(1,3)  Thread(2,3)  Thread(3,3) ...", width);
+    printContentLine("        ...          ...          ...          ...     ...", width);
+    printEmptyLine(width);
 
-        char buffer[256];
-        snprintf(buffer, sizeof(buffer), "   • Up to: %d x %d x %d blocks",
-                 prop.maxGridSize[0], prop.maxGridSize[1], prop.maxGridSize[2]);
-        gridContent.push_back(buffer);
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), " Threads per block: up to %s",
+             formatNumber(prop.maxThreadsPerBlock).c_str());
+    printContentLine(buffer, width);
 
-        gridContent.push_back("   • This is just the addressable space, not the");
-        gridContent.push_back("     number of blocks that run simultaneously");
-        gridContent.push_back("");
+    snprintf(buffer, sizeof(buffer), " Threads share %.1f KB of shared memory",
+             static_cast<double>(prop.sharedMemPerBlock) / 1024.0);
+    printContentLine(buffer, width);
 
-        printContentBox("GRID LEVEL (2D view of blocks)", BOX_WIDTH, gridContent);
-    }
+    snprintf(buffer, sizeof(buffer), " Threads execute in warps of %d", prop.warpSize);
+    printContentLine(buffer, width);
+    printEmptyLine(width);
+    printSectionFooter(width);
 
-    // BLOCK LEVEL SECTION
-    {
-        std::vector<std::string> blockContent;
-        blockContent.push_back("");
-        blockContent.push_back("   Thread(0,0)   Thread(1,0)   Thread(2,0)   ...");
-        blockContent.push_back("   Thread(0,1)   Thread(1,1)   Thread(2,1)   ...");
-        blockContent.push_back("   Thread(0,2)   Thread(1,2)   Thread(2,2)   ...");
-        blockContent.push_back("        ...          ...          ...        ...");
-        blockContent.push_back("");
+    // HARDWARE LEVEL
+    printSectionHeader("HARDWARE LEVEL - Streaming Multiprocessors", width);
+    printEmptyLine(width);
+    printContentLine("     SM 0           SM 1           SM 2         ...", width);
+    printContentLine("   +----------+   +----------+   +----------+", width);
+    printContentLine("   | Block A  |   | Block D  |   | Block G  |", width);
+    printContentLine("   | Block B  |   | Block E  |   | Block H  |", width);
+    printContentLine("   | Block C  |   | Block F  |   | Block I  |", width);
+    printContentLine("   +----------+   +----------+   +----------+", width);
+    printEmptyLine(width);
 
-        char buffer[256];
-        snprintf(buffer, sizeof(buffer), "   • Max threads per block: %d", prop.maxThreadsPerBlock);
-        blockContent.push_back(buffer);
+    snprintf(buffer, sizeof(buffer), " Total SMs: %d", prop.multiProcessorCount);
+    printContentLine(buffer, width);
 
-        snprintf(buffer, sizeof(buffer), "   • Thread dimensions: %d x %d x %d",
-                 prop.maxThreadsDim[0], prop.maxThreadsDim[1], prop.maxThreadsDim[2]);
-        blockContent.push_back(buffer);
+    snprintf(buffer, sizeof(buffer), " Max blocks per SM: %d", prop.maxBlocksPerMultiProcessor);
+    printContentLine(buffer, width);
 
-        blockContent.push_back("   • Threads in a block share memory");
+    long long totalConcurrentBlocks = (long long)prop.multiProcessorCount * prop.maxBlocksPerMultiProcessor;
+    snprintf(buffer, sizeof(buffer), " Total concurrent blocks: %s",
+             formatNumber(totalConcurrentBlocks).c_str());
+    printContentLine(buffer, width);
+    printEmptyLine(width);
+    printSectionFooter(width);
 
-        snprintf(buffer, sizeof(buffer), "   • Shared memory per block: %.2f KB",
-                 prop.sharedMemPerBlock / 1024.0f);
-        blockContent.push_back(buffer);
-        blockContent.push_back("");
+    // EXECUTION SUMMARY
+    printSectionHeader("EXECUTION SUMMARY", width);
+    printEmptyLine(width);
+    printContentLine(" KEY CONCEPT:", width);
+    printEmptyLine(width);
 
-        printContentBox("BLOCK LEVEL (single block, showing threads)", BOX_WIDTH, blockContent);
-    }
+    long long theoreticalBlocks = (long long)prop.maxGridSize[0] * prop.maxGridSize[1] * prop.maxGridSize[2];
+    snprintf(buffer, sizeof(buffer), " Theoretical grid capacity: %s blocks",
+             formatNumber(theoreticalBlocks).c_str());
+    printContentLine(buffer, width);
 
-    // HARDWARE LEVEL SECTION
-    {
-        std::vector<std::string> hwContent;
-        hwContent.push_back("");
-        hwContent.push_back("   SM 0        SM 1        SM 2        ...");
-        hwContent.push_back("   +--------+  +--------+  +--------+");
-        hwContent.push_back("   |Block   |  |Block   |  |Block   |");
-        hwContent.push_back("   |Block   |  |Block   |  |Block   |");
-        hwContent.push_back("   |Block   |  |Block   |  |Block   |");
-        hwContent.push_back("   +--------+  +--------+  +--------+");
-        hwContent.push_back("");
-        hwContent.push_back("   PRACTICAL EXECUTION LIMITS:");
+    snprintf(buffer, sizeof(buffer), " Actual concurrent execution: %s blocks",
+             formatNumber(totalConcurrentBlocks).c_str());
+    printContentLine(buffer, width);
 
-        char buffer[256];
-        snprintf(buffer, sizeof(buffer), "   • Number of SMs: %d", prop.multiProcessorCount);
-        hwContent.push_back(buffer);
+    printEmptyLine(width);
+    printContentLine(" EXECUTION FLOW:", width);
+    printContentLine(" 1. Your kernel launches a grid of blocks", width);
+    printContentLine(" 2. GPU scheduler assigns blocks to available SMs", width);
+    printContentLine(" 3. Each SM processes its assigned blocks", width);
+    printContentLine(" 4. When a block finishes, SM gets a new block", width);
+    printContentLine(" 5. Process continues until all blocks complete", width);
+    printEmptyLine(width);
+    printContentLine(" ANALOGY: Think of it like a restaurant:", width);
+    printContentLine(" - You can take orders for 1000 tables (grid size)", width);
 
-        snprintf(buffer, sizeof(buffer), "   • Max blocks per SM: %d", prop.maxBlocksPerMultiProcessor);
-        hwContent.push_back(buffer);
+    snprintf(buffer, sizeof(buffer), " - But you only have %d chefs (SMs)", prop.multiProcessorCount);
+    printContentLine(buffer, width);
 
-        snprintf(buffer, sizeof(buffer), "   • Warp size: %d threads", prop.warpSize);
-        hwContent.push_back(buffer);
+    snprintf(buffer, sizeof(buffer), " - Each chef can cook %d dishes at once (blocks per SM)",
+             prop.maxBlocksPerMultiProcessor);
+    printContentLine(buffer, width);
 
-        snprintf(buffer, sizeof(buffer), "   • Total concurrent blocks: ~%d",
-                 prop.multiProcessorCount * prop.maxBlocksPerMultiProcessor);
-        hwContent.push_back(buffer);
-        hwContent.push_back("");
-
-        printContentBox("HARDWARE LEVEL (Streaming Multiprocessors)", BOX_WIDTH, hwContent);
-    }
-
-    // EXECUTION SUMMARY SECTION
-    {
-        std::vector<std::string> summaryContent;
-        summaryContent.push_back("");
-        summaryContent.push_back("  THE KEY POINT:");
-
-        char buffer[256];
-        snprintf(buffer, sizeof(buffer), "  • Theoretical grid space: %d x %d x %d blocks",
-                 prop.maxGridSize[0], prop.maxGridSize[1], prop.maxGridSize[2]);
-        summaryContent.push_back(buffer);
-
-        snprintf(buffer, sizeof(buffer), "  • But only ~%d blocks run simultaneously",
-                 prop.multiProcessorCount * prop.maxBlocksPerMultiProcessor);
-        summaryContent.push_back(buffer);
-
-        summaryContent.push_back("");
-        summaryContent.push_back("  1. Your kernel defines a grid of blocks");
-
-        snprintf(buffer, sizeof(buffer), "  2. Each block contains up to %d threads", prop.maxThreadsPerBlock);
-        summaryContent.push_back(buffer);
-
-        snprintf(buffer, sizeof(buffer), "  3. The GPU has %d SMs (processors)", prop.multiProcessorCount);
-        summaryContent.push_back(buffer);
-
-        snprintf(buffer, sizeof(buffer), "  4. Each SM can process up to %d blocks at once",
-                 prop.maxBlocksPerMultiProcessor);
-        summaryContent.push_back(buffer);
-
-        snprintf(buffer, sizeof(buffer), "  5. Max concurrent threads: ~%d",
-                 prop.multiProcessorCount * prop.maxBlocksPerMultiProcessor * prop.maxThreadsPerBlock);
-        summaryContent.push_back(buffer);
-
-        summaryContent.push_back("");
-        summaryContent.push_back("  THINK OF IT LIKE:");
-        summaryContent.push_back("  • You can queue millions of blocks");
-
-        snprintf(buffer, sizeof(buffer), "  • But only ~%d blocks run at once",
-                 prop.multiProcessorCount * prop.maxBlocksPerMultiProcessor);
-        summaryContent.push_back(buffer);
-
-        summaryContent.push_back("  • The rest wait their turn");
-        summaryContent.push_back("");
-
-        printContentBox("EXECUTION SUMMARY", BOX_WIDTH, summaryContent);
-    }
-}
-
-// Print device properties with improved formatting
-void printDeviceProperties(cudaDeviceProp prop)
-{
-    printf("\n===== CUDA DEVICE PROPERTIES =====\n");
-
-    // Grid level properties
-    printf("\nADDRESSING LIMITS (Theoretical Maximum):\n");
-    printf("\tGrid address space: (%d, %d, %d)\n",
-           prop.maxGridSize[0],
-           prop.maxGridSize[1],
-           prop.maxGridSize[2]);
-    printf("\t- X dimension: %d (2^31-1)\n", prop.maxGridSize[0]);
-    printf("\t- Y dimension: %d (2^16-1)\n", prop.maxGridSize[1]);
-    printf("\t- Z dimension: %d (2^16-1)\n", prop.maxGridSize[2]);
-    printf("\tThread address space per block: (%d, %d, %d)\n",
-           prop.maxThreadsDim[0],
-           prop.maxThreadsDim[1],
-           prop.maxThreadsDim[2]);
-    printf("\t- Maximum threads per block: %d total\n", prop.maxThreadsPerBlock);
-
-    // Hardware properties
-    printf("\nEXECUTION RESOURCES (Practical Limits):\n");
-    printf("\tHardware:\n");
-    printf("\t- Streaming Multiprocessors (SMs): %d\n", prop.multiProcessorCount);
-    printf("\t- Warp size: %d threads\n", prop.warpSize);
-    printf("\t- Max blocks per SM: %d\n", prop.maxBlocksPerMultiProcessor);
-    printf("\t- Shared memory per block: %.2f KB\n",
-           static_cast<float>(prop.sharedMemPerBlock) / 1024);
-
-    printf("\tConcurrent execution capacity:\n");
-    printf("\t- Maximum concurrent blocks: ~%d (%d SMs × %d blocks)\n",
-           prop.multiProcessorCount * prop.maxBlocksPerMultiProcessor,
-           prop.multiProcessorCount, prop.maxBlocksPerMultiProcessor);
-    printf("\t- Maximum concurrent threads: ~%d\n",
-           prop.multiProcessorCount * prop.maxBlocksPerMultiProcessor * prop.maxThreadsPerBlock);
-
-    printf("\tMemory:\n");
-    printf("\t- Total global memory: %.2f GB\n",
-           static_cast<float>(prop.totalGlobalMem) / (1024 * 1024 * 1024));
-    printf("\t- Total constant memory: %.2f KB\n",
-           static_cast<float>(prop.totalConstMem) / 1024);
-
-    printf("\tCompute capability: %d.%d\n\n",
-           prop.major, prop.minor);
-
-    printf("NOTE: While you can address billions of blocks in theory,\n");
-    printf("only ~%d blocks can execute concurrently on this device.\n",
-           prop.multiProcessorCount * prop.maxBlocksPerMultiProcessor);
-    printf("The rest wait in a queue.\n\n");
+    printContentLine(" - Orders wait in queue until a chef is free", width);
+    printEmptyLine(width);
+    printSectionFooter(width);
 }
 
 int main()
 {
+    const int BOX_WIDTH = 80;
+
     int deviceCount = 0;
     checkCudaErrors(cudaGetDeviceCount(&deviceCount));
 
     if (deviceCount == 0)
     {
-        printf("No CUDA devices found\n");
+        std::cout << "No CUDA devices found" << std::endl;
         return 1;
     }
 
-    printf("Found %d CUDA device(s)\n", deviceCount);
+    std::cout << "Found " << deviceCount << " CUDA device(s)" << std::endl << std::endl;
 
-    // iterate over all devices
     for (int dev = 0; dev < deviceCount; dev++)
     {
-        // instantiate device properties
         cudaDeviceProp deviceProp;
-
         checkCudaErrors(cudaGetDeviceProperties(&deviceProp, dev));
 
-        printf("\nDevice %d: \"%s\"\n", dev, deviceProp.name);
+        std::cout << "Device " << dev << ": \"" << deviceProp.name << "\"" << std::endl << std::endl;
+
+        // Print title
+        printTitleBox("CUDA EXECUTION HIERARCHY", deviceProp.name, BOX_WIDTH);
 
         // Print device properties
-        printDeviceProperties(deviceProp);
+        printDeviceProperties(deviceProp, BOX_WIDTH);
 
-        // Print ASCII diagram of CUDA hierarchy
-        printCudaHierarchy(deviceProp);
+        // Print execution hierarchy
+        printCudaHierarchy(deviceProp, BOX_WIDTH);
+
+        if (dev < deviceCount - 1)
+        {
+            std::cout << std::string(BOX_WIDTH, '=') << std::endl << std::endl;
+        }
     }
 
     return 0;

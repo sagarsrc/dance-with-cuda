@@ -1,5 +1,7 @@
 /**
  * simple 1D array and printing
+ * nvcc -arch=sm_75 ./003-arrays/array_1d.cu -o ./run.bin && ./run.bin
+ * while running on T4 use -arch=sm_75 to specify GPU architecture
  */
 
 #include <cuda_runtime.h>
@@ -71,8 +73,16 @@ int main(int argc, char **argv)
     cudaDeviceSynchronize();
 
     printf("Printing indices\n");
-    dim3 threads(2, 3);
-    dim3 blocks(4, 4);
+    dim3 threads(2, 3); // blockDim
+    dim3 blocks(4, 4); // gridDim
+
+    /**
+     * printIndices<<<gridDim: blocks, blockDim: threads>>>();
+     *                  |           |
+     *                  |           |--> how many threads in a block
+     *                  |--> how many blocks in grid
+     */
+
     printIndices<<<blocks, threads>>>();
     cudaDeviceSynchronize();
 
