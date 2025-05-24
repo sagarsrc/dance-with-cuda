@@ -1,9 +1,6 @@
 /**
  * Basic CUDA Hello World program
  *
- * Compilation: nvcc hello.cu -o cu_hello.bin
- * Execution: ./cu_hello.bin
- *
  * CUDA Terminology:
  * - Host: CPU and its memory
  * - Device: GPU and its memory

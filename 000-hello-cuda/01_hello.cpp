@@ -1,6 +1,5 @@
-/*
-g++ hello.cpp -o cpp_hello.bin
-./cpp_hello.bin
+/**
+* Simple hello world program in C++
 */
 
 #include <iostream>

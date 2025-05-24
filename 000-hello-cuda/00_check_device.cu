@@ -1,10 +1,18 @@
+/**
+* This program retrieves and displays information about the CUDA devices present on the system.
+* It prints the device name and its properties.
+* It also provides a visual representation of the CUDA execution hierarchy,
+* including grids, blocks, threads, and streaming multiprocessors (SMs).
+* It also provides an execution summary and an analogy to help understand
+* the CUDA execution model.
+*/
+
 #include <stdio.h>
 #include <iostream>
 #include <cuda_runtime.h>
 #include <string>
 #include <vector>
 #include <algorithm>
-#include <sstream>
 
 // Error handling function
 #define checkCudaErrors(call)                                     \

@@ -1,7 +1,5 @@
 /**
  * simple 1D array and printing
- * nvcc -arch=sm_75 ./003-arrays/array_1d.cu -o ./run.bin && ./run.bin
- * while running on T4 use -arch=sm_75 to specify GPU architecture
  */
 
 #include <cuda_runtime.h>
